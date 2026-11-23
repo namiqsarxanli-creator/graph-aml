@@ -1,0 +1,12 @@
+# Runtime: what the API container needs. torch is installed from the CPU wheel index first
+# (see Dockerfile / CI), so this pin is already satisfied by 2.15.0+cpu.
+fastapi==0.165.0
+lightgbm==4.7.0
+networkx==3.7
+numpy==2.5.5
+pandas==3.1.1
+pydantic==2.14.4
+python-multipart==0.0.34
+scikit-learn==1.9.1
+torch==2.15.0
+uvicorn==0.54.0

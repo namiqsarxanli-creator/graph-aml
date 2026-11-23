@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+data/raw/
+data/processed/
+.env
+.claude/
+.idea/
+*.zip
+
+# personal lesson notes, not part of the project
+docs/ders_qeydleri.md

@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Money Trail Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,200;9..144,300;9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f2f4ee;        /* pale mint-white around the cards */
+  --sage: #bfc1b7;        /* hero card */
+  --sage-deep: #a9ac9f;
+  --cream: #faf9f5;       /* content cards */
+  --stone: #e7e6de;
+  --ink: #2a2c25;
+  --ink-soft: #5d6052;
+  --olive: #6b6e5c;
+  --line: #d9dad1;
+  --mint: #8fe3c4;        /* the soft glow accent */
+  --mint-deep: #3f9f80;
+  --risk: #c4694c;        /* terracotta instead of alarm red */
+  --cycle: #8a7bb5;
+  --white: #ffffff;
+  --radius-xl: 32px;
+  --radius: 20px;
+  --ease: cubic-bezier(.22, .9, .27, 1);
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; overflow-y: scroll; }
+/* clip (not hidden): hides sideways overflow without turning the body into a scroll box that swallows the scrollbar */
+body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: clip; }
+/* some browser extensions inject `body { overflow-y: hidden }` into every page; keep this page scrollable regardless */
+html { overflow-y: scroll !important; }
+body { overflow-y: visible !important; overflow-x: clip !important; height: auto !important; }
+html::-webkit-scrollbar { width: 12px; }
+html::-webkit-scrollbar-track { background: var(--page); }
+html::-webkit-scrollbar-thumb { background: var(--sage-deep); border-radius: 12px; border: 3px solid var(--page); }
+html::-webkit-scrollbar-thumb:hover { background: var(--olive); }
+::selection { background: var(--mint); color: var(--ink); }
+
+/* ---------------------------------------------------------------- hero */
+.hero {
+  position: relative; margin: 14px; height: calc(100svh - 28px); min-height: 520px;
+  background: radial-gradient(120% 90% at 50% 45%, #c9cbc1 0%, var(--sage) 55%, #b4b6ab 100%);
+  border-radius: var(--radius-xl); overflow: hidden; isolation: isolate;
+}
+#net { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.hero .word {
+  position: absolute; top: 46%; z-index: 2; margin: 0; color: var(--white);
+  font: 200 clamp(64px, 12vw, 200px)/0.9 var(--serif); letter-spacing: -0.035em;
+  font-variation-settings: "opsz" 144; transform: translateY(-50%); white-space: nowrap; pointer-events: none;
+}
+.hero .word.left { left: 4vw; }
+.hero .word.right { right: 4vw; }
+.hero .word span { display: inline-block; opacity: 0; transform: translateY(40%); filter: blur(6px);
+  animation: rise 1.2s var(--ease) forwards; }
+@keyframes rise { to { opacity: 1; transform: none; filter: none; } }
+.hero .tag {
+  position: absolute; left: 50%; top: 28px; transform: translateX(-50%); z-index: 2;
+  font: 500 11px/1 var(--sans); letter-spacing: .32em; text-transform: uppercase; color: var(--white);
+  opacity: 0; animation: fade 1s .9s var(--ease) forwards; white-space: nowrap;
+}
+.hero .lede {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 2; width: min(520px, 86%);
+  text-align: center; color: var(--ink); font-size: 16px; opacity: 0; animation: fade 1s 1.3s var(--ease) forwards;
+}
+.hero .lede b { font-weight: 600; }
+.chev {
+  position: absolute; left: 50%; bottom: 34px; z-index: 2; width: 46px; height: 46px; margin-left: -23px;
+  display: grid; place-items: center; border-radius: 50%; color: var(--white); text-decoration: none;
+  opacity: 0; animation: fade 1s 1.6s var(--ease) forwards;
+}
+.chev svg { width: 34px; height: 18px; animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(7px); } }
+@keyframes fade { to { opacity: 1; } }
+.glow-dot { position: absolute; left: 50%; top: 42%; width: 220px; height: 220px; margin: -110px 0 0 -110px; z-index: 1;
+  border-radius: 50%; background: radial-gradient(circle, rgba(143,227,196,.55), rgba(143,227,196,0) 70%);
+  animation: breathe 5s ease-in-out infinite; pointer-events: none; }
+@keyframes breathe { 50% { transform: scale(1.25); opacity: .6; } }
+
+/* ---------------------------------------------------------------- statement */
+.statement { max-width: 1100px; margin: 0 auto; padding: 120px 24px 90px; text-align: center; }
+.eyebrow { font: 500 11px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; color: var(--olive); }
+.statement h2 { margin: 22px 0 0; font: 300 clamp(34px, 5.2vw, 72px)/1.08 var(--serif); letter-spacing: -0.02em; }
+.statement h2 em { font-style: italic; color: var(--olive); }
+.versus { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 760px; margin: 64px auto 0; }
+.vs-card { background: var(--cream); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 24px; text-align: left;
+  transition: transform .5s var(--ease), box-shadow .5s var(--ease); }
+.vs-card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px -24px rgba(42,44,37,.35); }
+.vs-card.model { background: var(--ink); color: var(--cream); border-color: var(--ink); position: relative; overflow: hidden; }
+.vs-card.model::after { content: ""; position: absolute; right: -60px; top: -60px; width: 180px; height: 180px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(143,227,196,.45), transparent 70%); animation: breathe 5s ease-in-out infinite; }
+.vs-card .lbl { font: 500 11px/1 var(--sans); letter-spacing: .24em; text-transform: uppercase; opacity: .7; }
+.vs-card .num { font: 200 clamp(56px, 8vw, 96px)/1 var(--serif); margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+.vs-card .num small { font: 300 .32em/1 var(--sans); opacity: .65; margin-left: 6px; letter-spacing: 0; }
+.vs-card .sub { font-size: 14px; opacity: .8; }
+.vs-card .bar { height: 4px; border-radius: 4px; background: rgba(127,127,127,.25); margin-top: 18px; overflow: hidden; }
+.vs-card .bar i { display: block; height: 100%; width: 0; background: var(--mint); transition: width 1.6s var(--ease); }
+.vs-card:not(.model) .bar i { background: var(--risk); }
+
+/* ---------------------------------------------------------------- workspace */
+.workspace { max-width: 1400px; margin: 0 auto; padding: 0 14px 60px; }
+.ws-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; padding: 0 10px 22px; }
+.ws-head h3 { margin: 10px 0 0; font: 300 clamp(30px, 3.4vw, 46px)/1.05 var(--serif); letter-spacing: -0.015em; }
+.ws-head p { margin: 0; color: var(--ink-soft); max-width: 460px; font-size: 14px; }
+.grid { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; gap: 14px; }
+.card { background: var(--cream); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; }
+.controls label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--ink-soft); }
+.controls output { font: 300 22px/1 var(--serif); color: var(--ink); font-variant-numeric: tabular-nums; }
+select { font: 500 13px var(--sans); color: var(--ink); background: var(--stone); border: 1px solid var(--line); border-radius: 999px;
+  padding: 9px 14px; appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--olive) 50%), linear-gradient(135deg, var(--olive) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 3px; border-radius: 3px; background: var(--line); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ink);
+  border: 3px solid var(--cream); box-shadow: 0 0 0 1px var(--ink); cursor: pointer; transition: transform .25s var(--ease); }
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 3px solid var(--cream); }
+
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.kpi { border-radius: 16px; padding: 14px 14px 12px; background: var(--stone); }
+.kpi.model { background: var(--ink); color: var(--cream); }
+.kpi h4 { margin: 0; font: 500 10px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; opacity: .7; }
+.kpi .big { font: 200 40px/1 var(--serif); margin: 10px 0 8px; font-variant-numeric: tabular-nums; }
+.kpi .big small { font: 400 12px var(--sans); opacity: .65; }
+.kv { display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; font-variant-numeric: tabular-nums; opacity: .9; }
+.kv b { font-weight: 600; }
+.pos { color: var(--mint-deep); } .kpi.model .pos { color: var(--mint); } .neg { color: var(--risk); }
+
+.queue { margin-top: 16px; max-height: 50vh; overflow: auto; padding-right: 4px; scrollbar-width: thin; }
+.item { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 11px 10px; border-radius: 14px;
+  cursor: pointer; opacity: 0; transform: translateY(10px); animation: itemIn .6s var(--ease) forwards;
+  transition: background .3s var(--ease), transform .3s var(--ease); }
+@keyframes itemIn { to { opacity: 1; transform: none; } }
+.item:hover { background: var(--stone); }
+.item.sel { background: var(--ink); color: var(--cream); }
+.item .rank { font: 300 20px/1 var(--serif); opacity: .55; }
+.ring { width: 30px; height: 30px; }
+.acc { font: 500 12px/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { font-size: 12px; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.truth { font: 500 10px/1 var(--sans); letter-spacing: .06em; padding: 6px 9px; border-radius: 999px; white-space: nowrap; text-transform: uppercase; }
+.truth.yes { background: rgba(196,105,76,.14); color: var(--risk); }
+.truth.no { background: var(--stone); color: var(--ink-soft); }
+.item.sel .truth.yes { background: rgba(255,255,255,.12); color: #f0b49f; }
+
+.trail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 20px; }
+.trail-head h3 { margin: 0; font: 300 28px/1.1 var(--serif); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink-soft); }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--c); vertical-align: 0; }
+.legend label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+#graph { position: relative; height: 60vh; min-height: 400px; margin-top: 14px; border-radius: 16px;
+  background: radial-gradient(90% 80% at 50% 45%, #f6f6f1, #ecece4); overflow: hidden; }
+#graph.loading::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
+  background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+.detail { margin-top: 16px; min-height: 90px; }
+.detail .amt { font: 300 26px/1.1 var(--serif); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { font-size: 12px; padding: 6px 11px; border-radius: 999px; background: var(--stone); opacity: 0; transform: translateY(6px); animation: itemIn .5s var(--ease) forwards; }
+.chip.flag { background: rgba(196,105,76,.12); color: var(--risk); }
+.chip.cyc { background: rgba(138,123,181,.15); color: var(--cycle); }
+.muted { color: var(--ink-soft); }
+.small { font-size: 12px; color: var(--ink-soft); }
+
+footer { text-align: center; padding: 30px 16px 50px; font-size: 12px; color: var(--ink-soft); }
+
+/* scroll reveal */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: 1fr; }
+  .queue { max-height: none; }
+  .hero .word { top: auto; bottom: 270px; transform: none; font-size: clamp(64px, 23vw, 140px); }
+  .hero .word.left { left: 18px; } .hero .word.right { right: 18px; bottom: 195px; }
+  .hero .lede { bottom: 78px; font-size: 14px; }
+  .chev { bottom: 18px; }
+  .glow-dot { top: 32%; }
+  .statement { padding: 80px 16px 60px; }
+  .versus { grid-template-columns: 1fr; }
+  #graph { height: 52vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<section class="hero" aria-label="Money Trail Monitor">
+  <canvas id="net" aria-hidden="true"></canvas>
+  <div class="glow-dot" aria-hidden="true"></div>
+  <div class="tag">A graph-aware AML monitor</div>
+  <h1 class="word left" aria-label="money"><span>money</span></h1>
+  <div class="word right" aria-hidden="true"><span style="animation-delay:.18s">trail</span></div>
+  <p class="lede">Every payment is a line between two accounts. Laundering hides in the <b>shape</b> those lines make,
+    not in any single row. This page follows the money.</p>
+  <a class="chev" href="#story" aria-label="Scroll to the results">
+    <svg viewBox="0 0 34 18" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 1l16 16L33 1"/></svg>
+  </a>
+</section>
+
+<section class="statement" id="story">
+  <div class="eyebrow reveal">One synthetic bank day · 20 reviews by an analyst</div>
+  <h2 class="reveal">Rules look at payments <em>one by one</em>.<br>The graph looks at how they <em>connect</em>.</h2>
+  <div class="versus">
+    <div class="vs-card reveal" id="vsRules">
+      <div class="lbl">Red-flag rules</div>
+      <div class="num"><span data-count="0">0</span><small>/ <span class="of">0</span> schemes</small></div>
+      <div class="sub" id="vsRulesSub">&nbsp;</div>
+      <div class="bar"><i></i></div>
+    </div>
+    <div class="vs-card model reveal" id="vsModel">
+      <div class="lbl">Graph model</div>
+      <div class="num"><span data-count="0">0</span><small>/ <span class="of">0</span> schemes</small></div>
+      <div class="sub" id="vsModelSub">&nbsp;</div>
+      <div class="bar"><i></i></div>
+    </div>
+  </div>
+</section>
+
+<section class="workspace" id="workspace">
+  <div class="ws-head reveal">
+    <div>
+      <div class="eyebrow">The analyst's desk</div>
+      <h3>Follow any alert.</h3>
+    </div>
+    <p>Data is generated, never real. Ground truth is shown because it is known here. Pick a day, set the budget,
+      then click an alert to see the money around it.</p>
+  </div>
+  <div class="grid">
+    <section class="card reveal">
+      <div class="controls">
+        <label>Bank day <select id="seed"></select></label>
+        <label>Alerts per day <output id="kOut">20</output><input id="k" type="range" min="5" max="80" step="1" value="20"></label>
+        <label>Cost per alert <output id="costOut">15</output><input id="cost" type="range" min="0" max="100" step="5" value="15"></label>
+        <label>Value per scheme <output id="valOut">2,000</output><input id="val" type="range" min="0" max="10000" step="250" value="2000"></label>
+      </div>
+      <div class="kpis" id="vs"></div>
+      <div class="queue" id="queue" role="list"></div>
+    </section>
+    <section class="card reveal">
+      <div class="trail-head">
+        <h3 id="gTitle">Money trail</h3>
+        <div class="legend">
+          <span style="--c: var(--risk)">high risk</span>
+          <span style="--c: var(--sage-deep)">other</span>
+          <span style="--c: var(--cycle)">money returns</span>
+          <span style="--c: var(--mint-deep)">selected</span>
+          <label><input type="checkbox" id="truth" checked> dashed = true laundering</label>
+        </div>
+      </div>
+      <div id="graph" role="img" aria-label="Transaction graph around the selected alert"></div>
+      <div class="detail" id="detail"><span class="muted">Select an alert on the left.</span></div>
+    </section>
+  </div>
+</section>
+
+<footer><span id="modelTag">loading model…</span></footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (x, d = 0) => Number(x).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let state = { seed: 0, k: 20, data: null, selected: null, cy: null, flowTimer: null };
+
+/* ------------------------------------------------------------ hero network (canvas) */
+(function heroNet() {
+  const cv = $("net"), ctx = cv.getContext("2d");
+  let W, H, dpr, nodes = [], edges = [], pulses = [], visible = true, mx = 0.5, my = 0.5;
+  const N = 46;
+  function resize() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function init() {
+    resize(); nodes = []; edges = [];
+    const narrow = W < 900, cx = W / 2, cy = H * (narrow ? 0.33 : 0.46), R = Math.min(W, H) * (narrow ? 0.42 : 0.36);
+    for (let i = 0; i < N; i++) {
+      const a = Math.random() * Math.PI * 2, r = R * Math.sqrt(Math.random());
+      nodes.push({ x: cx + r * Math.cos(a) * (narrow ? 1 : 1.35), y: cy + r * Math.sin(a) * (narrow ? 0.8 : 1), ox: 0, oy: 0, ph: Math.random() * 6.28, s: 1.4 + Math.random() * 2.2 });
+    }
+    // a laundering ring in the middle: a closed cycle of 6 accounts
+    const ring = [];
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2 - Math.PI / 2;
+      ring.push(nodes.push({ x: cx + Math.cos(a) * R * 0.42, y: cy - R * 0.08 + Math.sin(a) * R * 0.42, ox: 0, oy: 0, ph: i, s: 3.2, hot: true }) - 1);
+    }
+    for (let i = 0; i < 6; i++) edges.push({ a: ring[i], b: ring[(i + 1) % 6], hot: true });
+    for (let i = 0; i < N; i++) {
+      const d = nodes.slice(0, N).map((n, j) => [Math.hypot(n.x - nodes[i].x, n.y - nodes[i].y), j]).sort((p, q) => p[0] - q[0]);
+      for (let k = 1; k <= 2; k++) edges.push({ a: i, b: d[k][1] });
+      if (Math.random() < 0.25) edges.push({ a: i, b: ring[Math.floor(Math.random() * 6)] });
+    }
+  }
+  function spawn() {
+    const e = edges[Math.floor(Math.random() * edges.length)];
+    pulses.push({ e, t: 0, v: 0.004 + Math.random() * 0.006 });
+  }
+  function pos(n, t) { return [n.x + Math.sin(t * 0.0006 + n.ph) * 8 + (mx - .5) * 18 * (n.hot ? 1.4 : .6),
+                               n.y + Math.cos(t * 0.0005 + n.ph) * 8 + (my - .5) * 14 * (n.hot ? 1.4 : .6)]; }
+  let ringPulse = 0;
+  function frame(t) {
+    if (!visible) { requestAnimationFrame(frame); return; }
+    ctx.clearRect(0, 0, W, H);
+    const P = nodes.map((n) => pos(n, t));
+    for (const e of edges) {
+      const [x1, y1] = P[e.a], [x2, y2] = P[e.b];
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.strokeStyle = e.hot ? "rgba(143,227,196,.75)" : "rgba(255,255,255,.28)"; ctx.lineWidth = e.hot ? 1.6 : 1; ctx.stroke();
+    }
+    // money moving round the ring
+    ringPulse = (ringPulse + 0.006) % 6;
+    const i0 = Math.floor(ringPulse), f = ringPulse - i0, ringIdx = N + i0, next = N + (i0 + 1) % 6;
+    const rx = P[ringIdx][0] + (P[next][0] - P[ringIdx][0]) * f, ry = P[ringIdx][1] + (P[next][1] - P[ringIdx][1]) * f;
+    const g = ctx.createRadialGradient(rx, ry, 0, rx, ry, 22); g.addColorStop(0, "rgba(143,227,196,.95)"); g.addColorStop(1, "rgba(143,227,196,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(rx, ry, 22, 0, 6.28); ctx.fill();
+    // small payments flowing through the rest of the network
+    if (!reduce && Math.random() < 0.25 && pulses.length < 40) spawn();
+    pulses = pulses.filter((p) => (p.t += p.v) < 1);
+    for (const p of pulses) {
+      const [x1, y1] = P[p.e.a], [x2, y2] = P[p.e.b];
+      ctx.fillStyle = p.e.hot ? "rgba(143,227,196,.95)" : "rgba(255,255,255,.85)";
+      ctx.beginPath(); ctx.arc(x1 + (x2 - x1) * p.t, y1 + (y2 - y1) * p.t, p.e.hot ? 2.6 : 1.6, 0, 6.28); ctx.fill();
+    }
+    nodes.forEach((n, i) => {
+      ctx.beginPath(); ctx.arc(P[i][0], P[i][1], n.s, 0, 6.28);
+      ctx.fillStyle = n.hot ? "#e9fff6" : "rgba(255,255,255,.75)"; ctx.fill();
+    });
+    if (!reduce) requestAnimationFrame(frame);
+  }
+  addEventListener("resize", init);
+  addEventListener("pointermove", (e) => { mx = e.clientX / innerWidth; my = e.clientY / innerHeight; });
+  new IntersectionObserver(([en]) => { visible = en.isIntersecting; }).observe(cv);
+  init(); requestAnimationFrame(frame);
+})();
+
+/* ------------------------------------------------------------ scroll reveal + counters */
+const io = new IntersectionObserver((ents) => ents.forEach((en) => {
+  if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
+}), { threshold: 0.15 });
+document.querySelectorAll(".reveal").forEach((el, i) => { el.style.transitionDelay = (i % 3) * 0.12 + "s"; io.observe(el); });
+
+function countTo(el, to, ms = 1400) {
+  if (reduce) { el.textContent = fmt(to); return; }
+  const from = +el.dataset.count || 0, t0 = performance.now();
+  const step = (t) => { const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(Math.round(from + (to - from) * e)); if (k < 1) requestAnimationFrame(step); else el.dataset.count = to; };
+  requestAnimationFrame(step);
+}
+
+/* ------------------------------------------------------------ data */
+for (let i = 0; i < 10; i++) $("seed").insertAdjacentHTML("beforeend", `<option value="${i}">Synthetic day ${i + 1}</option>`);
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function renderVersus() {
+  const cmp = state.data.comparison, m = cmp[state.data.model], r = cmp.rules;
+  [["vsModel", m], ["vsRules", r]].forEach(([id, c]) => {
+    if (!c) return;
+    const card = $(id);
+    countTo(card.querySelector("[data-count]"), c.schemes_caught);
+    card.querySelector(".of").textContent = c.schemes;
+    card.querySelector(".bar i").style.width = (c.schemes ? 100 * c.schemes_caught / c.schemes : 0) + "%";
+  });
+  $("vsModelSub").textContent = `${m.true_alerts} of ${m.alerts} alerts were real laundering`;
+  if (r) $("vsRulesSub").textContent = `${r.true_alerts} of ${r.alerts} alerts were real laundering`;
+}
+
+function kpi(c, isModel) {
+  const cost = c.alerts * +$("cost").value, value = c.schemes_caught * +$("val").value, net = value - cost;
+  return `<div class="kpi ${isModel ? "model" : ""}">
+    <h4>${isModel ? "Graph model" : "Rules"}</h4>
+    <div class="big">${c.schemes_caught}<small> / ${c.schemes} schemes</small></div>
+    <div class="kv"><span>true alerts</span><b>${c.true_alerts} / ${c.alerts}</b></div>
+    <div class="kv"><span>laundered $ found</span><b>${fmt(c.laundered_usd_caught)}</b></div>
+    <div class="kv"><span>net value</span><b class="${net >= 0 ? "pos" : "neg"}">${fmt(net)}</b></div>
+  </div>`;
+}
+function renderKpis() {
+  const d = state.data, cmp = d.comparison;
+  $("vs").innerHTML = kpi(cmp[d.model], true) + (cmp.rules ? kpi(cmp.rules, false) : "");
+}
+
+function ring(r) {
+  const c = 2 * Math.PI * 12, off = c * (1 - r);
+  return `<svg class="ring" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="3"/>
+    <circle cx="15" cy="15" r="12" fill="none" stroke="var(--risk)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 15 15)"/></svg>`;
+}
+function renderQueue() {
+  const q = $("queue");
+  q.innerHTML = state.data.alerts.map((a, i) => `
+    <div class="item ${state.selected === a.txn ? "sel" : ""}" data-txn="${a.txn}" tabindex="0" role="listitem" style="animation-delay:${Math.min(i, 14) * 40}ms">
+      ${ring(a.risk)}
+      <div style="min-width:0">
+        <div class="acc">${a.from_account} → ${a.to_account}</div>
+        <div class="meta">${a.time.slice(11)} · ${fmt(a.amount, 2)} ${a.currency} · ${a.format}</div>
+      </div>
+      <span class="truth ${a.is_laundering ? "yes" : "no"}">${a.is_laundering ? (a.pattern || "laundering") : "normal"}</span>
+    </div>`).join("");
+  q.querySelectorAll(".item").forEach((el) => {
+    const go = () => select(+el.dataset.txn);
+    el.onclick = go;
+    el.onkeydown = (e) => { if (e.key === "Enter") go(); };
+  });
+}
+
+async function load() {
+  state.k = +$("k").value;
+  state.data = await getJSON(`/demo/case?seed=${state.seed}&k=${state.k}`);
+  renderVersus(); renderKpis();
+  $("modelTag").textContent = `served model: ${state.data.model} · ${fmt(state.data.transactions)} transactions today · ${fmt(state.data.history_transactions)} in history · synthetic data`;
+  if (!state.data.alerts.some((a) => a.txn === state.selected)) state.selected = null;
+  renderQueue();
+  if (state.selected === null && state.data.alerts.length) select(state.data.alerts[0].txn);
+}
+
+async function select(txn) {
+  state.selected = txn;
+  document.querySelectorAll(".item").forEach((el) => el.classList.toggle("sel", +el.dataset.txn === txn));
+  $("graph").classList.add("loading");
+  const g = await getJSON(`/demo/graph?seed=${state.seed}&txn=${txn}`);
+  $("graph").classList.remove("loading");
+  drawGraph(g);
+  const a = state.data.alerts.find((x) => x.txn === txn);
+  const reasons = (a?.reasons || []).map((r, i) => `<span class="chip" style="animation-delay:${i * 70}ms">${r.label}</span>`).join("");
+  const flags = (a?.rule_flags || []).map((f, i) => `<span class="chip flag" style="animation-delay:${(i + 4) * 70}ms">rule: ${f.replaceAll("_", " ")}</span>`).join("");
+  const cyc = g.cycles.slice(0, 3).map((c, i) => `<span class="chip cyc" style="animation-delay:${(i + 8) * 70}ms">cycle of ${c.length} accounts</span>`).join("");
+  $("gTitle").textContent = a ? `Money trail of ${a.from_account}` : "Money trail";
+  $("detail").innerHTML = a ? `
+    <div class="amt">${fmt(a.amount, 2)} ${a.currency} <span class="small">≈ $${fmt(a.amount_usd)} · ${a.format} · ${a.time}</span></div>
+    <div class="small" style="margin-top:4px">risk ${a.risk.toFixed(3)} · truth:
+      <b style="color:${a.is_laundering ? "var(--risk)" : "var(--ink-soft)"}">${a.is_laundering ? (a.pattern || "laundering") : "normal"}</b>
+      · ${g.nodes.length} accounts and ${g.edges.length} payments within two steps</div>
+    <div class="chips">${reasons || '<span class="chip">the graph pattern drives this score</span>'}${flags}${cyc}</div>` : "";
+}
+
+function drawGraph(g) {
+  const risk = css("--risk"), node = css("--sage-deep"), cyc = css("--cycle"), sel = css("--mint-deep"), muted = css("--ink-soft"), line = "#cfd0c6";
+  const showTruth = $("truth").checked;
+  const els = [
+    ...g.nodes.map((n) => ({ data: { id: "n" + n.id, label: n.label.split(":")[1].slice(-6), risk: n.risk, focal: n.focal, cyc: n.in_cycle } })),
+    ...g.edges.map((e) => ({ data: { id: "e" + e.id, source: "n" + e.source, target: "n" + e.target, risk: e.risk,
+      w: Math.max(1, Math.log10(e.amount_usd + 10) - 0.6), focal: e.focal, bad: e.is_laundering && showTruth, today: e.scored_today } })),
+  ];
+  if (state.cy) state.cy.destroy();
+  clearInterval(state.flowTimer);
+  state.cy = cytoscape({
+    container: $("graph"), elements: els, wheelSensitivity: 0.3,
+    style: [
+      { selector: "node", style: {
+          "background-color": (n) => n.data("focal") ? sel : n.data("cyc") ? cyc : (n.data("risk") > 0.5 ? risk : node),
+          width: (n) => n.data("focal") ? 24 : 12, height: (n) => n.data("focal") ? 24 : 12,
+          "border-width": (n) => n.data("focal") ? 6 : 0, "border-color": "rgba(143,227,196,.55)",
+          label: (n) => (n.data("focal") || n.data("risk") > 0.5 || n.data("cyc")) ? n.data("label") : "",
+          "font-family": "Inter, sans-serif", "font-size": 9, color: muted, "text-valign": "bottom", "text-margin-y": 4 } },
+      { selector: "edge", style: {
+          width: "data(w)", "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 0.7,
+          "line-color": (e) => e.data("focal") ? sel : (e.data("risk") > 0.5 ? risk : line),
+          "target-arrow-color": (e) => e.data("focal") ? sel : (e.data("risk") > 0.5 ? risk : line),
+          "line-style": (e) => e.data("bad") ? "dashed" : "solid", "line-dash-pattern": [6, 5],
+          opacity: (e) => e.data("today") || e.data("focal") ? 1 : 0.5 } },
+      { selector: "edge[?focal]", style: { width: 4, "z-index": 10 } },
+    ],
+    layout: { name: "cose", animate: !reduce, animationDuration: 900, animationEasing: "ease-out-cubic",
+              nodeRepulsion: 9000, idealEdgeLength: 60, randomize: true, fit: true, padding: 24 },
+  });
+  // money keeps moving along the laundering edges
+  if (!reduce) {
+    let off = 0;
+    const bad = state.cy.edges().filter((e) => e.data("bad"));
+    state.flowTimer = setInterval(() => { off = (off - 1) % 110; bad.style("line-dash-offset", off); }, 40);
+  }
+  state.cy.on("tap", "edge", (ev) => {
+    const id = +ev.target.id().slice(1);
+    if (state.data.alerts.some((a) => a.txn === id)) select(id);
+  });
+}
+
+let timer;
+const debounced = (fn) => () => { clearTimeout(timer); timer = setTimeout(fn, 200); };
+$("k").oninput = () => { $("kOut").textContent = $("k").value; debounced(load)(); };
+$("cost").oninput = () => { $("costOut").textContent = $("cost").value; if (state.data) renderKpis(); };
+$("val").oninput = () => { $("valOut").textContent = fmt($("val").value); if (state.data) renderKpis(); };
+$("seed").onchange = () => { state.seed = +$("seed").value; state.selected = null; load(); };
+$("truth").onchange = () => { if (state.selected !== null) select(state.selected); };
+
+load().catch((e) => { $("queue").innerHTML = `<p class="muted">Could not load the demo: ${e.message}</p>`; });
+</script>
+</body>
+</html>

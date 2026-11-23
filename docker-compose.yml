@@ -1,0 +1,11 @@
+# Local run:       docker compose up --build        -> http://127.0.0.1:8090
+# Production:      see deploy/README.md (adds Caddy for HTTPS)
+services:
+  api:
+    build: .
+    image: graphaml-api:latest
+    restart: unless-stopped
+    environment:
+      AML_API_KEY: ${AML_API_KEY:-}
+    ports:
+      - "127.0.0.1:8090:8000"

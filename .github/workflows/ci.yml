@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      # Everything runs on synthetic data and the committed bundle; no Kaggle download in CI.
+      - run: pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t graphaml-api:ci .
+      - name: smoke test
+        run: |
+          docker run -d --name api -e AML_API_KEY=ci -p 8000:8000 graphaml-api:ci
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8000/health && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8000/alerts -F file=@examples/transactions_example.csv)" = 401
+          curl -sf -X POST http://127.0.0.1:8000/alerts -H "X-API-Key: ci" -F file=@examples/transactions_example.csv | head -c 600
+          curl -sf "http://127.0.0.1:8000/demo/case?seed=1&k=10" > /dev/null
+          curl -sf http://127.0.0.1:8000/ > /dev/null
